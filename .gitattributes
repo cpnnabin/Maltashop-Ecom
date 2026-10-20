@@ -1,4 +1,0 @@
-# Keep line endings stable between Windows and Linux/Docker/CI
-* text=auto eol=lf
-*.png binary
-*.jpg binary
