@@ -12,10 +12,18 @@ async function init() {
       product_id VARCHAR(64) NOT NULL,
       quantity INT NOT NULL,
       status VARCHAR(32) NOT NULL,
-      correlation_id VARCHAR(64),
+      correlation_id VARCHAR(100),
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
   `);
+  // Columns added later; safe to run on a database created by an older version.
+  await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS cancel_reason TEXT;`);
+  await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();`);
+  await pool.query(`ALTER TABLE orders ALTER COLUMN correlation_id TYPE VARCHAR(100);`);
+}
+
+async function ping() {
+  await pool.query('SELECT 1');
 }
 
 async function createOrder({ id, customerId, productId, quantity, status, correlationId }) {
@@ -27,7 +35,23 @@ async function createOrder({ id, customerId, productId, quantity, status, correl
 }
 
 async function updateOrderStatus(id, status) {
-  await pool.query(`UPDATE orders SET status = $1 WHERE id = $2`, [status, id]);
+  await pool.query(`UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2`, [status, id]);
+}
+
+/**
+ * Moves an order out of PENDING exactly once (PENDING -> CONFIRMED or PENDING -> CANCELLED).
+ * Returns true if this call changed the order, false if it was already decided or does not exist.
+ * Because the check and the update are one statement, duplicate or conflicting events cannot
+ * flip an order that has already been decided.
+ */
+async function transitionFromPending(id, status, reason = null) {
+  const res = await pool.query(
+    `UPDATE orders
+        SET status = $2, cancel_reason = $3, updated_at = NOW()
+      WHERE id = $1 AND status = 'PENDING'`,
+    [id, status, reason]
+  );
+  return res.rowCount === 1;
 }
 
 async function getOrder(id) {
@@ -35,4 +59,8 @@ async function getOrder(id) {
   return res.rows[0];
 }
 
-module.exports = { init, createOrder, updateOrderStatus, getOrder, pool };
+async function close() {
+  await pool.end();
+}
+
+module.exports = { init, ping, createOrder, updateOrderStatus, transitionFromPending, getOrder, close, pool };

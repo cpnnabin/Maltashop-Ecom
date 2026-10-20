@@ -1,14 +1,12 @@
 {
   "name": "order-service",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "directories": {
-    "test": "tests"
-  },
+  "description": "MaltaShop Order service: accepts orders and runs its half of the order saga",
+  "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "test": "jest"
+    "test": "jest",
+    "test:db": "jest db.integration"
   },
   "keywords": [],
   "author": "",
@@ -18,10 +16,12 @@
     "amqplib": "^2.2.0",
     "express": "^5.3.0",
     "pg": "^8.23.1",
-    "pino": "^10.4.0",
-    "uuid": "^14.0.3"
+    "pino": "^10.4.0"
   },
   "devDependencies": {
     "jest": "^30.5.2"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

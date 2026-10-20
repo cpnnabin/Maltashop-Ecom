@@ -1,6 +1,7 @@
 # MaltaShop prototype: Order + Inventory services, each with its own PostgreSQL database,
 # connected only through RabbitMQ. Start everything with:  docker compose up --build
-# Every credential can be overridden from a .env file (see .env.example); the defaults are for a laptop only.
+# Every credential can be overridden from a .env file (copy .env.example to .env); the defaults are for a laptop only.
+# After upgrading from an older version of this project, reset the old databases once: docker compose down -v
 
 services:
   rabbitmq:
@@ -58,6 +59,10 @@ services:
       rabbitmq:
         condition: service_healthy
       postgres-order:
+        condition: service_healthy
+      # Inventory declares its queue before it reports healthy, so an OrderPlaced event
+      # published right after start-up is never dropped for lack of a queue.
+      inventory-service:
         condition: service_healthy
     restart: unless-stopped
 

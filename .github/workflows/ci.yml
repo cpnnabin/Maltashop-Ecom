@@ -5,9 +5,14 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  test:
+  unit-tests:
+    name: Unit and contract tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,25 +20,110 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            order-service/package-lock.json
+            inventory-service/package-lock.json
+            tests/package-lock.json
 
       - name: Install order-service
         working-directory: ./order-service
-        run: npm install
+        run: npm ci
 
       - name: Install inventory-service
         working-directory: ./inventory-service
-        run: npm install
+        run: npm ci
 
-      - name: Run order-service tests
+      - name: Install contract and saga-flow tests
+        working-directory: ./tests
+        run: npm ci
+
+      - name: Test order-service
         working-directory: ./order-service
-        run: npm test -- --passWithNoTests
+        run: npm test
 
-      - name: Run inventory-service tests
+      - name: Test inventory-service
         working-directory: ./inventory-service
-        run: npm test -- --passWithNoTests
+        run: npm test
+
+      - name: Contract tests and saga-flow test
+        working-directory: ./tests
+        run: npm test
+
+  db-integration:
+    name: Database tests (real PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            order-service/package-lock.json
+            inventory-service/package-lock.json
+
+      - name: Install order-service
+        working-directory: ./order-service
+        run: npm ci
+
+      - name: Install inventory-service
+        working-directory: ./inventory-service
+        run: npm ci
+
+      - name: Order database tests
+        working-directory: ./order-service
+        run: npm run test:db
+
+      - name: Inventory database tests
+        working-directory: ./inventory-service
+        run: npm run test:db
+
+  docker:
+    name: Docker images and end-to-end smoke test
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node (for the smoke test script)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
 
       - name: Build Docker images
         run: |
           docker build -t order-service ./order-service
           docker build -t inventory-service ./inventory-service
+
+      - name: Start the whole system with Docker Compose
+        run: docker compose up -d --build --wait --wait-timeout 240
+
+      - name: End-to-end smoke test (success, failure, duplicate, dead-letter)
+        run: node scripts/smoke-test.js
+
+      - name: Show container logs if something failed
+        if: failure()
+        run: docker compose logs --no-color --tail=200
+
+      - name: Stop and clean up
+        if: always()
+        run: docker compose down -v
