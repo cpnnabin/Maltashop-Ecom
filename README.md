@@ -32,6 +32,15 @@ sequenceDiagram
     end
 ```
 
+## Get the code
+
+Requirements: [Docker Desktop](https://www.docker.com/products/docker-desktop/) (with Docker Compose) and Git. Node.js is only needed to run the services or tests outside Docker.
+
+```bash
+git clone https://github.com/Melan-Parajuli7/Malta-Shop.git
+cd Malta-Shop
+```
+
 ## Run it
 
 Requirement: Docker Desktop (includes Docker Compose).
