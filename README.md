@@ -1,4 +1,4 @@
-# MaltaShop Prototype: "Place an Order" Flow
+# Maltashop-Ecom
 
 A small microservices prototype for the MaltaShop case study (Unit 5: Service-Oriented Architecture and Microservices Fundamentals). It shows an order being placed across two independent services **without a shared database or a distributed transaction**, using a message broker and a choreography saga with a compensating action.
 
